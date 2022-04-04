@@ -25,36 +25,30 @@ class Decode
      */
     public static function splitMime($body, $boundary)
     {
-        // TODO: we're ignoring \r for now - is this function fast enough and is it safe to assume noone needs \r?
-        $body = str_replace("\r", '', $body);
-
-        $start = 0;
         $res = [];
         // find every mime part limiter and cut out the
         // string before it.
         // the part before the first boundary string is discarded:
-        $p = strpos($body, '--' . $boundary . "\n", $start);
-        if ($p === false) {
+        if (preg_match('/--' . $boundary . '\r?\n/', $body, $matches, PREG_OFFSET_CAPTURE) === 0) {
             // no parts found!
             return [];
         }
 
         // position after first boundary line
-        $start = $p + 3 + strlen($boundary);
+        $start = $matches[0][1] + strlen($matches[0][0]);
 
-        while (($p = strpos($body, '--' . $boundary . "\n", $start)) !== false) {
-            $res[] = substr($body, $start, $p - $start);
-            $start = $p + 3 + strlen($boundary);
+        while (preg_match('/--' . $boundary . '\r?\n/', $body, $matches, PREG_OFFSET_CAPTURE, $start) === 1) {
+            $res[] = substr($body, $start, $matches[0][1] - $start - 1);
+            $start = $matches[0][1] + strlen($matches[0][0]);
         }
 
         // no more parts, find end boundary
-        $p = strpos($body, '--' . $boundary . '--', $start);
-        if ($p === false) {
+        if (preg_match('/--' . $boundary . '--/', $body, $matches, PREG_OFFSET_CAPTURE, $start) !== 1) {
             throw new Exception\RuntimeException('Not a valid Mime Message: End Missing');
         }
 
         // the remaining part also needs to be parsed:
-        $res[] = substr($body, $start, $p - $start);
+        $res[] = substr($body, $start, $matches[0][1] - $start - 1);
         return $res;
     }
 
